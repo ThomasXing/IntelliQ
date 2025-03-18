@@ -1,5 +1,5 @@
-Flask==2.1.1
+fastapi==0.104.1
+uvicorn==0.24.0
 requests==2.26.0
-Werkzeug==2.3.7
-flask_cors==3.0.10
+pydantic==2.5.2
 dashscope==1.13.6

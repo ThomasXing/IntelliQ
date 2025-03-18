@@ -1,23 +1,35 @@
 {
-  "weather_query": {
-    "name": "问天气",
-    "description": "天气信息查询服务",
-    "example": "JSON：[{'name': 'date', 'desc': '查天气的具体日期。时间格式：yyyy-MM-dd', 'value': ''}]\n输入：我想要23年5月1日的天气\n答：{'name': 'date', 'value': '2023-05-01'}",
+  "company_dataset": {
+    "name": "企业知识问答",
+    "description": "松立集团介绍、数字生态介绍、新闻介绍、媒体知识问答等",
+    "parameters": []
+  },
+  "parklot_query": {
+    "name": "找车场",
+    "description": "找停车场、停车位服务",
+    "example": "JSON：[{'name': 'date', 'desc': '出发的具体时间。', 'value': ''}]\n输入：我想要23年5月1日下午三点出发\n答：{'name': 'date', 'value': '2023-05-01 15:00'}",
     "parameters": [
       {
         "name": "date",
-        "desc": "查天气的具体日期。时间格式：yyyy-MM-dd",
+        "desc": "出发的具体时间。时间格式：yyyy-MM-dd HH:mm",
         "type": "string",
         "required": true
       },
       {
         "name": "location",
-        "desc": "查天气的城市或地点",
+        "desc": "目标地点或者车场名称",
         "type": "string",
         "required": true
+      },
+      {
+        "name": "businessType",
+        "desc": "车场类型: 1-普通停车场；2-长租车场；3-充电车场；4-预约车场",
+        "type": "string",
+        "required": false
       }
     ]
   },
+  
   "hotel_booking": {
     "name": "订酒店",
     "description": "订酒店的服务",

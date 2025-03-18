@@ -41,7 +41,14 @@ def load_all_scene_configs():
                 all_scene_configs[key] = value
 
     return all_scene_configs
-
+example1_response = json.dumps(
+    {"scene": 1, "date": "2025-01-01 15:00:00", "location": "西二旗"},
+    ensure_ascii=False
+)
+sys_prompt = f"""提取scene、date和location，输出JSON。
+                示例：
+                Q：我打算下午三点在西二旗见朋友，帮我找个车场。
+                A：{example1_response}"""
 
 def send_message(message, user_input):
     """
@@ -57,13 +64,15 @@ def send_message(message, user_input):
         "Authorization": f"Bearer {config.API_KEY}",
         "Content-Type": "application/json",
     }
-
     data = {
         "model": config.MODEL,
         "messages": [
-            {"role": "system", "content": config.SYSTEM_PROMPT},
+            {"role": "system", "content": f"{config.SYSTEM_PROMPT}"},
             {"role": "user", "content": f"{message}"}
-        ]
+        ],
+        # "response_format": { 
+        #     "type": "json_object"
+        # }
     }
 
     try:
@@ -74,6 +83,7 @@ def send_message(message, user_input):
             print('--------------------------------------------------------------------')
             return answer
         else:
+            print('LLM原输出:', response.json())
             print(f"Error: {response.status_code}")
             return None
     except requests.RequestException as e:
