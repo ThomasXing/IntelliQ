@@ -16,10 +16,11 @@ chatbot_model = ChatbotModel(load_all_scene_configs())
 def api_multi_question():
     data = request.json
     question = data.get('question')
+    session_id = data.get('session_id', 'default_session')
     if not question:
         return jsonify({"error": "No question provided"}), 400
 
-    response = chatbot_model.process_multi_question(question)
+    response = chatbot_model.process_multi_question(question, session_id)
     return jsonify({"answer": response})
 
 
@@ -30,4 +31,4 @@ def index():
 
 if __name__ == '__main__':
     before_init()
-    app.run(port=5000, debug=True)
+    app.run(port=5100, debug=True)

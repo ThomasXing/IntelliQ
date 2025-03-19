@@ -5,13 +5,15 @@ from config import RELATED_INTENT_THRESHOLD
 from scene_processor.impl.common_processor import CommonProcessor
 from utils.data_format_utils import extract_continuous_digits, extract_float
 from utils.helpers import send_message
+from .session_manager import SessionManager
 
 
 class ChatbotModel:
     def __init__(self, scene_templates: dict):
         self.scene_templates: dict = scene_templates
-        self.current_purpose: str = ''
+        self.session_manager = SessionManager()
         self.processors = {}
+        self.current_purpose = None
 
     @staticmethod
     def load_scene_processor(self, scene_config):
@@ -53,9 +55,11 @@ class ChatbotModel:
         # 根据用户选择获取对应场景
         if user_choices and user_choices[0] != '0':
             self.current_purpose = purpose_options[user_choices[0]]
-
+        # else:
+        #     self.current_purpose = None
         if self.current_purpose:
             print(f"用户选择了场景：{self.scene_templates[self.current_purpose]['name']}")
+            print(f"{self.session_manager.}")
             # 这里可以继续处理其他逻辑
         else:
             # 用户输入的选项无效的情况，可以进行相应的处理
@@ -73,25 +77,41 @@ class ChatbotModel:
         self.processors[scene_name] = processor_class
         return self.processors[scene_name]
 
-    def process_multi_question(self, user_input):
+    def process_multi_question(self, user_input: str, session_id: str):
         """
         处理多轮问答
-        :param user_input:
-        :return:
+        :param user_input: 用户输入
+        :param session_id: 会话ID
+        :return: 处理结果
         """
+        # 获取或创建会话
+        session = self.session_manager.get_session(session_id)
+        if not session:
+            session = self.session_manager.create_session(session_id)
+
         # 检查当前输入是否与上一次的意图场景相关
-        if self.is_related_to_last_intent(user_input):
+        current_purpose = session.get('current_purpose', '')
+        if current_purpose and self.is_related_to_last_intent(user_input):
             pass
         else:
             # 不相关时，重新识别意图
             self.recognize_intent(user_input)
-        logging.info('current_purpose: %s', self.current_purpose)
+            # 更新会话中的当前意图
+            session['current_purpose'] = self.current_purpose
+            self.session_manager.update_session(session_id, session)
 
-        if self.current_purpose in self.scene_templates:
-            # 根据场景模板调用相应场景的处理逻辑
-            self.get_processor_for_scene(self.current_purpose)
+        logging.info('current_purpose: %s', session['current_purpose'])
+
+        if session['current_purpose'] in self.scene_templates:
+            # 获取会话特定的处理器
+            processor = session['processors'].get(session['current_purpose'])
+            if not processor:
+                processor = self.get_processor_for_scene(session['current_purpose'])
+                session['processors'][session['current_purpose']] = processor
+                self.session_manager.update_session(session_id, session)
+
             # 调用抽象类process方法
-            return self.processors[self.current_purpose].process(user_input, None)
+            return processor.process(user_input, {'session_id': session_id})
         return '未命中场景'
 
 

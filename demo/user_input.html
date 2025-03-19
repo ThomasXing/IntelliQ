@@ -184,22 +184,93 @@
             // 显示用户输入的问题
             var chatOutput = document.getElementById('chat-output');
             chatOutput.innerHTML += '<div>你: ' + message + '</div>';
-
+            
+            // 记录请求开始时间
+            const startTime = Date.now();
+            
             // 发送请求到 Flask API
-            fetch('http://127.0.0.1:5000/multi_question', {
+            // 创建新的回答容器
+            const responseDiv = document.createElement('div');
+            responseDiv.innerHTML = '回答: <span class="typing"></span><span class="response-time"></span>';
+            chatOutput.appendChild(responseDiv);
+            const typingSpan = responseDiv.querySelector('.typing');
+            const responseTimeSpan = responseDiv.querySelector('.response-time');
+
+            fetch('http://127.0.0.1:5100/multi_question', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({ question: message, session_id: chatId })
             })
-            .then(response => response.json())
-            .then(data => {
-                // 显示返回的答案
-                chatOutput.innerHTML += '<div>回答: ' + data.answer + '</div>';
-                chatOutput.scrollTop = chatOutput.scrollHeight; // 滚动到底部
+            .then(response => {
+                // 检查响应的Content-Type来判断是否为流式传输
+                const contentType = response.headers.get('Content-Type');
+                if (contentType && contentType.includes('text/plain')) {
+                    // 流式传输处理
+                    const reader = response.body.getReader();
+                    let buffer = '';
+                    let decoder = new TextDecoder();
+                    
+                    function processText() {
+                        return reader.read().then(({done, value}) => {
+                            if (done) {
+                                // 计算并显示响应时间
+                                const endTime = Date.now();
+                                const responseTime = ((endTime - startTime) / 1000).toFixed(2);
+                                responseTimeSpan.textContent = ` (响应时间: ${responseTime}s)`;
+                                return;
+                            }
+                            
+                            // 解码并处理接收到的数据
+                            buffer += decoder.decode(value, {stream: true});
+                            typingSpan.textContent = buffer;
+                            chatOutput.scrollTop = chatOutput.scrollHeight;
+                            
+                            return processText();
+                        });
+                    }
+                    
+                    return processText();
+                    
+                    return new ReadableStream({
+                        start(controller) {
+                            function push() {
+                                reader.read().then(({done, value}) => {
+                                    if (done) {
+                                        controller.close();
+                                        const endTime = Date.now();
+                                        const responseTime = endTime - startTime;
+                                        responseTimeSpan.innerHTML = ` <span style="color: #666; font-size: 0.8em;">(响应时间: ${responseTime}ms)</span>`;
+                                        return;
+                                    }
+                                    
+                                    receivedLength += value.length;
+                                    const chunk = new TextDecoder().decode(value);
+                                    typingSpan.textContent += chunk;
+                                    chatOutput.scrollTop = chatOutput.scrollHeight;
+                                    controller.enqueue(value);
+                                    push();
+                                });
+                            }
+                            push();
+                        }
+                    });
+                } else {
+                    // 非流式传输处理
+                    return response.json().then(json => {
+                        typingSpan.textContent = json.answer;
+                        const endTime = Date.now();
+                        const responseTime = endTime - startTime;
+                        responseTimeSpan.innerHTML = ` <span style="color: #666; font-size: 0.8em;">(响应时间: ${responseTime}ms)</span>`;
+                        chatOutput.scrollTop = chatOutput.scrollHeight;
+                    });
+                }
             })
-            .catch(error => console.error('Error:', error));
+            .catch(error => {
+                console.error('Error:', error);
+                typingSpan.textContent = '发生错误，请重试';
+            });
         }
 
         function handleKeyPress(event) {
