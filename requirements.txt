@@ -1,5 +1,12 @@
-fastapi==0.104.1
 uvicorn==0.24.0
-requests==2.26.0
-pydantic==2.5.2
+requests==2.31.0
 dashscope==1.13.6
+openai==1.61.1
+langchain==0.3.19
+langchain-openai==0.3.7
+langchain-core==0.3.40
+langchain-community==0.3.18
+anyio>=4.4.0
+langsmith==0.3.11
+msgpack==1.1.0
+

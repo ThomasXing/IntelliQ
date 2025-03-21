@@ -11,7 +11,7 @@
     "parameters": [
       {
         "name": "date",
-        "desc": "出发的具体时间。时间格式：yyyy-MM-dd HH:mm",
+        "desc": "出发的具体时间。",
         "type": "string",
         "required": true
       },
@@ -20,41 +20,23 @@
         "desc": "目标地点或者车场名称",
         "type": "string",
         "required": true
-      },
-      {
-        "name": "businessType",
-        "desc": "车场类型: 1-普通停车场；2-长租车场；3-充电车场；4-预约车场",
-        "type": "string",
-        "required": false
       }
     ]
   },
   
-  "hotel_booking": {
-    "name": "订酒店",
-    "description": "订酒店的服务",
+  "parklot_nav": {
+    "name": "车场导航",
+    "description": "打开导航去车场的服务",
     "parameters": [
       {
-        "name": "入住地点",
-        "desc": "酒店的具体位置，可以是城市、地区等",
+        "name": "车场名称",
+        "desc": "车场名称",
         "type": "string",
         "required": true
       },
       {
-        "name": "入住开始日期",
-        "desc": "入住酒店的开始日期，日期格式：yyyy-MM-dd",
-        "type": "string",
-        "required": true
-      },
-      {
-        "name": "入住结束日期",
-        "desc": "入住酒店的结束日期，日期格式：yyyy-MM-dd",
-        "type": "string",
-        "required": true
-      },
-      {
-        "name": "酒店档次",
-        "desc": "酒店的档次，如豪华、经济等",
+        "name": "车场经纬度",
+        "desc": "车场经纬度",
         "type": "string",
         "required": true
       }

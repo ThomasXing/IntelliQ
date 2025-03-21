@@ -99,186 +99,130 @@
         <button id="fullscreen-btn">全屏</button>
         <div id="chat-output"></div>
         <div id="input-container">
-            <input type="text" id="chat-input" placeholder="输入问题..." onkeypress="handleKeyPress(event)">
-            <button onclick="sendMessage()">发送</button>
-            <button id="mic-btn" onclick="toggleMic()">🎤</button>
+            <input type="text" id="chat-input" placeholder="输入问题...">
+            <button id="send">发送</button>
+            <!-- <button id="mic-btn" onclick="toggleMic()">🎤</button> -->
+        </div>
+        <div style="margin-top: 10px;">
+            <label>
+                <input type="checkbox" id="stream-toggle">
+                启用流式响应
+            </label>
         </div>
     </div>
-
     <script>
-        var socket;
-        var mediaRecorder;
-        var recognizing = false;
-        var chatId = 'chatId' + Date.now()
-        function setupWebSocket() {
-            socket = new WebSocket('ws://10.21.8.6:43007');
-
-            socket.onopen = function(event) {
-                console.log('WebSocket connection established');
-            };
-
-            socket.onmessage = function(event) {
-                var chatOutput = document.getElementById('chat-output');
-                chatOutput.innerHTML += '<div>回答: ' + event.data + '</div>';
-                chatOutput.scrollTop = chatOutput.scrollHeight; // 滚动到底部
-            };
-
-            socket.onclose = function(event) {
-                console.log('WebSocket connection closed');
-            };
-
-            socket.onerror = function(error) {
-                console.error('WebSocket error:', error);
-            };
-        }
-
-        function toggleMic() {
-            if (recognizing) {
-                stopRecording();
-            } else {
-                startRecording();
+        // 获取DOM元素
+        const questionInput = document.getElementById('chat-input');
+        const sendButton = document.getElementById('send');
+        const streamToggle = document.getElementById('stream-toggle');
+        // 生成会话ID
+        const sessionId = 'session_' + Date.now();
+        
+        // 发送按钮点击事件
+        sendButton.addEventListener('click', function() {
+            sendMessage();
+        });
+        
+        // 按Enter键发送问题
+        questionInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendMessage();
             }
-        }
-
-        function startRecording() {
-            navigator.mediaDevices.getUserMedia({ audio: true })
-                .then(function(stream) {
-                    setupWebSocket();
-
-                    mediaRecorder = new MediaRecorder(stream, {
-                        mimeType: 'audio/webm'
-                    });
-
-                    mediaRecorder.ondataavailable = function(event) {
-                        if (event.data.size > 0 && socket.readyState === WebSocket.OPEN) {
-                            socket.send(event.data);
-                        }
-                    };
-
-                    mediaRecorder.start(100); // Send audio data in chunks of 100ms
-
-                    recognizing = true;
-                    document.getElementById('mic-btn').style.backgroundColor = '#dc3545';
-                })
-                .catch(function(err) {
-                    console.error('Error accessing microphone:', err);
-                });
-        }
-
-        function stopRecording() {
-            if (mediaRecorder) {
-                mediaRecorder.stop();
-            }
-            if (socket) {
-                socket.close();
-            }
-            recognizing = false;
-            document.getElementById('mic-btn').style.backgroundColor = '#28a745';
-        }
-
+        });
+        
         function sendMessage() {
-            var input = document.getElementById('chat-input');
-            var message = input.value;
-            input.value = '';
-
+            const message = questionInput.value.trim();
+            if (!message) return;
+            
+            // 清空输入框
+            questionInput.value = '';
+    
             // 显示用户输入的问题
-            var chatOutput = document.getElementById('chat-output');
-            chatOutput.innerHTML += '<div>你: ' + message + '</div>';
+            const chatOutput = document.getElementById('chat-output');
+            chatOutput.innerHTML += '<div style="margin-bottom: 10px;"><strong>你:</strong> ' + message + '</div>';
             
-            // 记录请求开始时间
-            const startTime = Date.now();
-            
-            // 发送请求到 Flask API
             // 创建新的回答容器
             const responseDiv = document.createElement('div');
-            responseDiv.innerHTML = '回答: <span class="typing"></span><span class="response-time"></span>';
+            responseDiv.style.marginBottom = '15px';
+            responseDiv.innerHTML = '<strong>回答:</strong> <span class="typing">思考中...</span><span class="response-time"></span>';
             chatOutput.appendChild(responseDiv);
             const typingSpan = responseDiv.querySelector('.typing');
             const responseTimeSpan = responseDiv.querySelector('.response-time');
-
-            fetch('http://127.0.0.1:5100/multi_question', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ question: message, session_id: chatId })
-            })
-            .then(response => {
-                // 检查响应的Content-Type来判断是否为流式传输
-                const contentType = response.headers.get('Content-Type');
-                if (contentType && contentType.includes('text/plain')) {
-                    // 流式传输处理
-                    const reader = response.body.getReader();
-                    let buffer = '';
-                    let decoder = new TextDecoder();
+            
+            // 记录请求开始时间
+            const startTime = Date.now();
+            let isFirstResponse = true;
+            
+            // 获取流式响应设置
+            const useStream = streamToggle.checked;
+            
+            if (useStream) {
+                // 使用SSE流式响应
+                // 关闭之前的EventSource（如果存在）
+                if (window.eventSource) {
+                    window.eventSource.close();
+                }
+                
+                // 创建新的EventSource连接
+                const url = `/multi_question?question=${encodeURIComponent(message)}&session_id=${sessionId}&stream=true`;
+                window.eventSource = new EventSource(url);
+                
+                let fullResponse = '';
+                
+                // 处理接收到的消息
+                window.eventSource.onmessage = function(event) {
+                    const data = event.data;
                     
-                    function processText() {
-                        return reader.read().then(({done, value}) => {
-                            if (done) {
-                                // 计算并显示响应时间
-                                const endTime = Date.now();
-                                const responseTime = ((endTime - startTime) / 1000).toFixed(2);
-                                responseTimeSpan.textContent = ` (响应时间: ${responseTime}s)`;
-                                return;
-                            }
-                            
-                            // 解码并处理接收到的数据
-                            buffer += decoder.decode(value, {stream: true});
-                            typingSpan.textContent = buffer;
-                            chatOutput.scrollTop = chatOutput.scrollHeight;
-                            
-                            return processText();
-                        });
+                    // 检查是否是结束信号
+                    if (data === '[DONE]') {
+                        window.eventSource.close();
+                        return;
                     }
                     
-                    return processText();
-                    
-                    return new ReadableStream({
-                        start(controller) {
-                            function push() {
-                                reader.read().then(({done, value}) => {
-                                    if (done) {
-                                        controller.close();
-                                        const endTime = Date.now();
-                                        const responseTime = endTime - startTime;
-                                        responseTimeSpan.innerHTML = ` <span style="color: #666; font-size: 0.8em;">(响应时间: ${responseTime}ms)</span>`;
-                                        return;
-                                    }
-                                    
-                                    receivedLength += value.length;
-                                    const chunk = new TextDecoder().decode(value);
-                                    typingSpan.textContent += chunk;
-                                    chatOutput.scrollTop = chatOutput.scrollHeight;
-                                    controller.enqueue(value);
-                                    push();
-                                });
-                            }
-                            push();
-                        }
-                    });
-                } else {
-                    // 非流式传输处理
-                    return response.json().then(json => {
-                        typingSpan.textContent = json.answer;
-                        const endTime = Date.now();
-                        const responseTime = endTime - startTime;
+                    // 计算首次响应时间
+                    if (isFirstResponse) {
+                        const responseTime = Date.now() - startTime;
                         responseTimeSpan.innerHTML = ` <span style="color: #666; font-size: 0.8em;">(响应时间: ${responseTime}ms)</span>`;
+                        isFirstResponse = false;
+                    }
+                    
+                    // 累加响应内容
+                    fullResponse += data;
+                    
+                    // 更新显示
+                    typingSpan.innerHTML = fullResponse;
+                    
+                    // 自动滚动到底部
+                    chatOutput.scrollTop = chatOutput.scrollHeight;
+                };
+                
+                // 处理错误
+                window.eventSource.onerror = function(error) {
+                    console.error('EventSource failed:', error);
+                    typingSpan.innerHTML += '<span style="color: red;">连接中断，请重试</span>';
+                    window.eventSource.close();
+                };
+            } else {
+                // 使用普通AJAX请求
+                fetch(`/multi_question?question=${encodeURIComponent(message)}&session_id=${sessionId}&stream=false`)
+                    .then(response => response.json())
+                    .then(data => {
+                        // 计算响应时间
+                        const responseTime = Date.now() - startTime;
+                        responseTimeSpan.innerHTML = ` <span style="color: #666; font-size: 0.8em;">(响应时间: ${responseTime}ms)</span>`;
+                        
+                        // 显示响应
+                        typingSpan.innerHTML = data.response;
+                        
+                        // 自动滚动到底部
                         chatOutput.scrollTop = chatOutput.scrollHeight;
+                    })
+                    .catch(error => {
+                        console.error('Fetch error:', error);
+                        typingSpan.innerHTML = '<span style="color: red;">请求失败，请重试</span>';
                     });
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                typingSpan.textContent = '发生错误，请重试';
-            });
-        }
-
-        function handleKeyPress(event) {
-            if (event.key === 'Enter') {
-                sendMessage();
             }
         }
-
         var fullScreenBtn = document.getElementById('fullscreen-btn');
         var chatContainer = document.getElementById('chat-container');
 
@@ -291,6 +235,8 @@
                 fullScreenBtn.textContent = '还原';
             }
         });
-    </script>
+      </script>
 </body>
 </html>
+
+

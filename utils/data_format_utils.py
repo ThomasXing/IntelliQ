@@ -23,8 +23,11 @@ def extract_floats(s):
 
 
 def extract_continuous_digits(text):
+    # 处理AIMessage类型
+    if hasattr(text, 'content'):
+        text = text.content
     # 使用正则表达式找到所有连续的数字
-    continuous_digits = re.findall(r'\d+', text)
+    continuous_digits = re.findall(r'\d+', str(text))
     return continuous_digits
 
 

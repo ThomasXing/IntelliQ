@@ -91,10 +91,21 @@ def send_message(message, user_input):
         return None
 
 
-def is_slot_fully_filled(json_data):
+def is_slot_fully_filled(scene_slots, session_slots=None):
     """
     检查槽位是否完整填充
+    
+    Args:
+        scene_slots: 场景定义的槽位列表
+        session_slots: 会话中已填充的槽位，如果为None则直接使用scene_slots检查
     """
+    # 如果只传入一个参数，则直接检查该参数
+    if session_slots is None:
+        json_data = scene_slots
+    else:
+        # 检查session_slots中是否包含scene_slots中定义的所有必要槽位
+        json_data = session_slots
+    
     # 遍历JSON数据中的每个元素
     for item in json_data:
         # 检查value字段是否为空字符串
@@ -145,8 +156,8 @@ def update_slot(json_data, dict_target):
     """
     # 遍历JSON数据中的每个元素
     for item in json_data:
-        # 检查value字段是否为空字符串
-        if item['value'] != '':
+        # 检查value字段是否存在且不为空字符串
+        if 'value' in item and item['value'] != '':
             for target in dict_target:
                 if target['name'] == item['name']:
                     target['value'] = item.get('value')
